@@ -22,7 +22,7 @@ export default function Page() {
           </h1>
           <p className="text-base text-gray-600 dark:text-gray-300 font-medium">
             Upload a <code>.txt</code> file and we’ll convert the contents to an
-            audio file using AWS Polly and Serverless Computing.
+            audio file using Amazon AWS Serverless Computing.
           </p>
         </div>
 
