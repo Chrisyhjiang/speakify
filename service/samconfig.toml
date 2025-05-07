@@ -1,0 +1,13 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "text-to-speech-stack"
+s3_bucket = "speakify-deployment-artifacts-850944117300"
+s3_prefix = "text-to-speech-stack"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "NotificationEmail=\"jiangwb70@yahoo.ca\""
+confirm_changeset = true
+image_repositories = []
+resolve_s3 = true

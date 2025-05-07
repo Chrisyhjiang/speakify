@@ -1,0 +1,141 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless Text-to-Speech Converter using Lambda, S3, Polly, SNS, and API Gateway
+
+Parameters:
+  NotificationEmail:
+    Type: String
+    Description: Email address for SNS notifications
+
+Resources:
+  TextInputBucket:
+    Type: AWS::S3::Bucket
+    DependsOn:
+      - TextToSpeechFunction
+    Properties:
+      BucketName: !Sub text-to-speech-input-${AWS::AccountId}
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt TextToSpeechFunction.Arn
+  AudioOutputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub text-to-speech-output-${AWS::AccountId}
+  ConversionNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: TextToSpeechConversion
+      Subscription:
+        - Endpoint: !Ref NotificationEmail
+          Protocol: email
+  TextToSpeechFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Timeout: 60
+      MemorySize: 128
+      Environment:
+        Variables:
+          INPUT_BUCKET: !Sub text-to-speech-input-${AWS::AccountId}
+          OUTPUT_BUCKET: !Ref AudioOutputBucket
+          SNS_TOPIC_ARN: !Ref ConversionNotificationTopic
+          ALLOWED_ORIGIN: "*" #"https://master.d3jm6amw295d2e.amplifyapp.com"
+
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Sub text-to-speech-input-${AWS::AccountId}
+        - S3WritePolicy:
+            BucketName: !Sub text-to-speech-output-${AWS::AccountId}
+        - S3WritePolicy:
+            BucketName: !Sub text-to-speech-input-${AWS::AccountId}
+        - Statement:
+            - Effect: Allow
+              Action:
+                - polly:SynthesizeSpeech
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref ConversionNotificationTopic
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'" #"'https://master.d3jm6amw295d2e.amplifyapp.com'"
+        MaxAge: "'3600'"
+      EndpointConfiguration: REGIONAL
+      Auth:
+        DefaultAuthorizer: NONE
+      DefinitionBody:
+        openapi: 3.0.1
+        info:
+          title: TextToSpeechApi
+          version: 1.0.0
+        paths:
+          /upload:
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TextToSpeechFunction.Arn}/invocations
+                httpMethod: POST
+                type: aws_proxy
+            options:
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'" #"'https://master.d3jm6amw295d2e.amplifyapp.com'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+  ApiGatewayLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref TextToSpeechFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/upload
+  TextToSpeechFunctionS3Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref TextToSpeechFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub arn:aws:s3:::text-to-speech-input-${AWS::AccountId}
+
+Outputs:
+  TextInputBucketName:
+    Description: Name of the input S3 bucket
+    Value: !Ref TextInputBucket
+  AudioOutputBucketName:
+    Description: Name of the output S3 bucket
+    Value: !Ref AudioOutputBucket
+  LambdaFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref TextToSpeechFunction
+  SNSTopicArn:
+    Description: ARN of the SNS topic
+    Value: !Ref ConversionNotificationTopic
+  ApiEndpoint:
+    Description: API Gateway endpoint URL for file upload
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/upload
