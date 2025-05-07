@@ -33,6 +33,7 @@ def lambda_handler(event, context):
 
     # ✅ Handle POST request
     if method == "POST": 
+        
         try: 
             # Case 1: Triggered by S3 upload (i.e., the .txt input file)
             if 'Records' in event and event['Records'][0]['eventSource'] == 'aws:s3':
