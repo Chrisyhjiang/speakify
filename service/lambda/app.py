@@ -45,7 +45,6 @@ def lambda_handler(event, context):
 
             # Case 2: Triggered by API Gateway
             elif 'body' in event:
-                
                 try:
                     body = event['body']
                     if event.get("isBase64Encoded"):
