@@ -10,4 +10,3 @@ capabilities = "CAPABILITY_IAM"
 parameter_overrides = "NotificationEmail=\"jiangwb70@yahoo.ca\""
 confirm_changeset = true
 image_repositories = []
-resolve_s3 = true
