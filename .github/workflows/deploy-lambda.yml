@@ -5,7 +5,7 @@ on:
     paths:
       - "service/**"
     branches:
-      - master # or whichever branch you use
+      - main # or whichever branch you use
 
 jobs:
   deploy:
